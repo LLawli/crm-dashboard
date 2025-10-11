@@ -1,6 +1,7 @@
 from src.db import get_connection
 from fastapi import APIRouter, status, HTTPException, Query
-from src.services. kommo_client import fetch_leads
+from src.services.kommo_client import fetch_leads
+from src.services.cache import *
 from src.utils import process_leads, dashboard_format, dashboard_format_flat
 
 router = APIRouter(prefix="/api/v1")
@@ -14,6 +15,20 @@ def get_leads(
     pipeline_id: int | None = Query(None, description="Pipeline ID"),
     status_id: int | None = Query(None, description="Status ID")
 ):
+    
+    cache_key = generate_cache_key(
+        campaigns=campaigns,
+        period=period,
+        date_from=date_from,
+        date_to=date_to,
+        pipeline_id=pipeline_id,
+        status_id=status_id
+    )
+
+    cached_data = cache_get(cache_key)
+    if cached_data:
+        return cached_data
+
     leads = fetch_leads(
         campaigns=campaigns,
         period=period,
@@ -24,7 +39,10 @@ def get_leads(
     )
 
     leads = process_leads(leads)
-    return {"count": len(leads), "data": leads}
+    response = {"count": len(leads), "data": leads}
+    cache_set(cache_key, response)
+
+    return response
 
 @router.get("/leads/dashboard", status_code=status.HTTP_200_OK)
 def get_dashboard(
@@ -35,7 +53,21 @@ def get_dashboard(
     pipeline_id: int | None = Query(None, description="Pipeline ID"),
     status_id: int | None = Query(None, description="Status ID"),
     flat: bool = Query(False, description="Flat data for dashboard (default=False)")
-):
+): 
+    cache_key = generate_cache_key(
+        campaigns=campaigns,
+        period=period,
+        date_from=date_from,
+        date_to=date_to,
+        pipeline_id=pipeline_id,
+        status_id=status_id,
+        flat=flat
+    )
+
+    cached_data = cache_get(cache_key)
+    if cached_data:
+        return cached_data
+    
     leads = fetch_leads(
         campaigns=campaigns,
         period=period,
@@ -51,4 +83,7 @@ def get_dashboard(
         leads = dashboard_format_flat(leads)
     else:
         leads = dashboard_format(leads)
-    return {"count": num, "data": leads}
+
+    response = {"count": num, "data": leads}
+    cache_set(cache_key, response)
+    return response
