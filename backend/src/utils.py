@@ -26,6 +26,12 @@ def period_handler(period: str, date_from: str | None = None, date_to: str | Non
             prev_end = init - timedelta(microseconds=1)
             prev_init = prev_end.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             return init, end, prev_init, prev_end
+        
+        elif period == "all":
+            end = 253402300799
+            init = 126701150399
+            prev_init = 0
+            prev_end = 126701150399
 
         elif period == "custom" and date_from and date_to:
             try:
@@ -54,7 +60,7 @@ def period_handler(period: str, date_from: str | None = None, date_to: str | Non
     prev_init = init - timedelta(days=1)
     return init, end, prev_init, prev_end
 
-def process_leads(leads_list):
+def process_leads(leads_list: list):
     if not leads_list:
         return []
 
@@ -91,3 +97,44 @@ def process_leads(leads_list):
         result.append(latest_lead)
 
     return result
+
+
+def dashboard_format(leads: list):
+    result_dict = {}
+
+    for lead in leads:
+        date_str = datetime.fromtimestamp(lead["created_at"]).strftime("%d/%m/%Y")
+
+        fields = {f.get("field_code"): f["values"][0]["value"] for f in lead.get("custom_fields_values", []) if f.get("field_code")}
+        campaign = fields.get("UTM_CAMPAIGN", "Unknown")
+        term = fields.get("UTM_TERM", "Unknown")
+        content = fields.get("UTM_CONTENT", "Unknown")
+
+        if date_str not in result_dict:
+            result_dict[date_str] = {}
+        if campaign not in result_dict[date_str]:
+            result_dict[date_str][campaign] = {}
+        if term not in result_dict[date_str][campaign]:
+            result_dict[date_str][campaign][term] = {}
+        if content not in result_dict[date_str][campaign][term]:
+            result_dict[date_str][campaign][term][content] = {"leads": 0, "converted_leads": 0, "plan_leads": 0}
+
+        counts = result_dict[date_str][campaign][term][content]
+        counts["leads"] += 1
+        if lead.get("converted"):
+            counts["converted_leads"] += 1
+        if lead.get("plan"):
+            counts["plan_leads"] += 1
+
+    final_result = []
+    for date, campaigns in result_dict.items():
+        campaign_list = []
+        for campaign_name, terms in campaigns.items():
+            term_list = []
+            for term_name, contents in terms.items():
+                content_list = [{"name": content_name, **counts} for content_name, counts in contents.items()]
+                term_list.append({"name": term_name, "contents": content_list})
+            campaign_list.append({"name": campaign_name, "terms": term_list})
+        final_result.append({"date": date, "campaigns": campaign_list})
+
+    return final_result
