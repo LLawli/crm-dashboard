@@ -1,5 +1,5 @@
 import redis
-from src.config import REDIS_DB, REDIS_HOST, REDIS_PORT
+from src.config import REDIS_DB, REDIS_HOST, REDIS_PORT, CACHE_DURATION
 import hashlib
 import json
 
@@ -11,8 +11,8 @@ def cache_get(key: str):
         return json.loads(cached)
     return None
 
-def cache_set(key: str, value, expire: int = 3600):
-    r.set(key, json.dumps(value), ex=expire)
+def cache_set(key: str, value):
+    r.set(key, json.dumps(value), ex=CACHE_DURATION)
 
 def generate_cache_key(**kwargs):
     key_string = json.dumps(kwargs, sort_keys=True)
