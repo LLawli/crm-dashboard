@@ -1,6 +1,7 @@
 from src.db import get_connection
 from fastapi import APIRouter, status, HTTPException, Query
 from src.services. kommo_client import fetch_leads
+from src.utils import process_leads
 
 router = APIRouter(prefix="/api/v1")
 
@@ -21,4 +22,6 @@ def get_leads(
         pipeline_id=pipeline_id,
         status_id=status_id,
     )
+
+    leads = process_leads(leads)
     return {"count": len(leads), "data": leads}

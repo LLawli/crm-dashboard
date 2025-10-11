@@ -61,6 +61,7 @@ def fetch_leads(
                 rate_limit()
 
                 params = {
+                    "with": "contacts",
                     "limit": 250,
                     "page": page,
                     "query": campaign,

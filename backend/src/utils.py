@@ -1,4 +1,6 @@
 from datetime import datetime, timedelta
+from collections import defaultdict
+from src.config import CONVERT_PIPE, PLAN_PIPE, WON_STATUS
 
 def period_handler(period: str, date_from: str | None = None, date_to: str | None = None) -> tuple[datetime, datetime, datetime, datetime]:
     today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -51,3 +53,39 @@ def period_handler(period: str, date_from: str | None = None, date_to: str | Non
     prev_end = init - timedelta(microseconds=1)
     prev_init = init - timedelta(days=1)
     return init, end, prev_init, prev_end
+
+def process_leads(leads_list):
+    if not leads_list:
+        return []
+
+    def get_fbclid(lead):
+        for field in lead.get("custom_fields_values", []):
+            if field.get("field_code") == "FBCLID":
+                return field["values"][0]["value"]
+        return None
+
+    def get_main_contact_id(lead):
+        contacts = lead.get("_embedded", {}).get("contacts", [])
+        for c in contacts:
+            if c.get("is_main"):
+                return c.get("id")
+        return None
+
+    groups = defaultdict(list)
+    for lead in leads_list:
+        key = get_fbclid(lead) or get_main_contact_id(lead)
+        groups[key].append(lead)
+
+    result = []
+    for group_leads in groups.values():
+        converted = any(l["pipeline_id"] == CONVERT_PIPE and l["status_id"] == WON_STATUS for l in group_leads)
+        plan = any(l["pipeline_id"] == PLAN_PIPE and l["status_id"] == WON_STATUS for l in group_leads)
+
+        latest_lead = max(group_leads, key=lambda l: l["created_at"])
+
+        latest_lead["converted"] = converted
+        latest_lead["plan"] = plan
+
+        result.append(latest_lead)
+
+    return result
