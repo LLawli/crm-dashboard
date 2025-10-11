@@ -3,3 +3,5 @@ backend/.venv
 backend/__pycache__
 backend/src/__pycache__
 backend/src/routes/__pycache__
+backend/uv.lock
+backend/pyproject.toml
