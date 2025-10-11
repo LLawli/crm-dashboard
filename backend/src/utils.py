@@ -82,6 +82,8 @@ def process_leads(leads_list):
         plan = any(l["pipeline_id"] == PLAN_PIPE and l["status_id"] == WON_STATUS for l in group_leads)
 
         latest_lead = max(group_leads, key=lambda l: l["created_at"])
+        oldest_created_at = min(l["created_at"] for l in group_leads)
+        latest_lead["created_at"] = oldest_created_at
 
         latest_lead["converted"] = converted
         latest_lead["plan"] = plan
