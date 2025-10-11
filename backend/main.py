@@ -1,9 +1,11 @@
-from typing import Union
 from fastapi import FastAPI
+from src.routes import campaigns
 
 app = FastAPI()
 
-@app.get("/hello-world")
-def hello_world():
-    return {"data": "Hello World"}
 
+@app.get("/ping")
+def ping():
+    return {"data": "pong"}
+
+app.include_router(campaigns.router)
