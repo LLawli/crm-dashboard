@@ -10,13 +10,6 @@ router = APIRouter(prefix="/api/v1")
 def add_campaign(campaign: CreateCampaign):
     conn = get_connection()
     cursor = conn.cursor()
-
-    cursor.execute("""
-CREATE TABLE IF NOT EXISTS campaigns (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE
-)INDEX
-""")
     
     cursor.execute("SELECT id FROM campaigns WHERE name = ?", (campaign.name,))
     resultado = cursor.fetchone()
@@ -50,5 +43,6 @@ def get_campaigns(search: str | None = Query(None, description="Search by name")
     rows = cursor.fetchall()
 
     campaigns = [Campaign(**dict(row)) for row in rows]
+
     conn.close()
     return campaigns

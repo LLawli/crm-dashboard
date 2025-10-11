@@ -1,7 +1,10 @@
 from fastapi import FastAPI
 from src.routes import campaigns
+from src.db import init_database
 
 app = FastAPI()
+
+init_database()
 
 
 @app.get("/ping")
