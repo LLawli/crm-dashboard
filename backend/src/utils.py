@@ -138,3 +138,38 @@ def dashboard_format(leads: list):
         final_result.append({"date": date, "campaigns": campaign_list})
 
     return final_result
+
+def dashboard_format_flat(leads: list):
+    flat_dict = {}
+
+    for lead in leads:
+        date_str = datetime.fromtimestamp(lead["created_at"]).strftime("%d/%m/%Y")
+
+        fields = {f.get("field_code"): f["values"][0]["value"] for f in lead.get("custom_fields_values", []) if f.get("field_code")}
+        campaign = fields.get("UTM_CAMPAIGN", "Unknown")
+        term = fields.get("UTM_TERM", "Unknown")
+        content = fields.get("UTM_CONTENT", "Unknown")
+
+        key = (date_str, campaign, term, content)
+
+        if key not in flat_dict:
+            flat_dict[key] = {"leads": 0, "converted_leads": 0, "plan_leads": 0}
+
+        flat_dict[key]["leads"] += 1
+        if lead.get("converted"):
+            flat_dict[key]["converted_leads"] += 1
+        if lead.get("plan"):
+            flat_dict[key]["plan_leads"] += 1
+
+    flat_list = [
+        {
+            "date": date,
+            "campaign": campaign,
+            "term": term,
+            "content": content,
+            **counts
+        }
+        for (date, campaign, term, content), counts in flat_dict.items()
+    ]
+
+    return flat_list

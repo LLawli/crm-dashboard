@@ -1,7 +1,7 @@
 from src.db import get_connection
 from fastapi import APIRouter, status, HTTPException, Query
 from src.services. kommo_client import fetch_leads
-from src.utils import process_leads, dashboard_format
+from src.utils import process_leads, dashboard_format, dashboard_format_flat
 
 router = APIRouter(prefix="/api/v1")
 
@@ -33,7 +33,8 @@ def get_dashboard(
     date_from: str | None = Query(None, description="Initial date (dd/mm/YYYY)"),
     date_to: str | None = Query(None, description="Final date (dd/mm/YYYY)"),
     pipeline_id: int | None = Query(None, description="Pipeline ID"),
-    status_id: int | None = Query(None, description="Status ID")
+    status_id: int | None = Query(None, description="Status ID"),
+    flat: bool = Query(False, description="Flat data for dashboard (default=False)")
 ):
     leads = fetch_leads(
         campaigns=campaigns,
@@ -45,5 +46,9 @@ def get_dashboard(
     )
 
     leads = process_leads(leads)
-    leads = dashboard_format(leads)
-    return {"count": len(leads), "data": leads}
+    num = len(leads)
+    if flat:
+        leads = dashboard_format_flat(leads)
+    else:
+        leads = dashboard_format(leads)
+    return {"count": num, "data": leads}
