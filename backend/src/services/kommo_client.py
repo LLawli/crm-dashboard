@@ -96,10 +96,9 @@ def fetch_leads(
 
                 page += 1
 
-    init, end, prev_init, prev_end = period_handler(period, date_from, date_to)
+    init, end = period_handler(period, date_from, date_to)
 
     _fetch_period(init.timestamp(), end.timestamp())
-    _fetch_period(prev_init.timestamp(), prev_end.timestamp())
 
 
     return leads

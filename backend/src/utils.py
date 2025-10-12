@@ -1,37 +1,31 @@
 from datetime import datetime, timedelta
 from collections import defaultdict
-from src.config import CONVERT_PIPE, PLAN_PIPE, WON_STATUS
+from src.config import CONVERT_PIPE, PLAN_PIPE, FOLLOW_PIPE, WON_STATUS
 
-def period_handler(period: str, date_from: str | None = None, date_to: str | None = None) -> tuple[datetime, datetime, datetime, datetime]:
+def period_handler(period: str, date_from: str | None = None, date_to: str | None = None) -> tuple[datetime, datetime]:
     today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     try:
         if period == "yesterday":
-            init = today - timedelta(days=1)
-            end = init.replace(hour=23, minute=59, second=59, microsecond=999999)
-            prev_init = init - timedelta(days=1)
-            prev_end = end - timedelta(days=1)
-            return init, end, prev_init, prev_end
+            end = today - timedelta(microseconds=1)
+            init = end.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=1)
+            return init, end
 
         elif period == "week":
-            init = today - timedelta(days=((today.weekday() + 1) % 7))
-            init = init.replace(hour=0, minute=0, second=0, microsecond=0)
-            end = datetime.now()
-            prev_init = init - timedelta(days=7)
-            prev_end = init - timedelta(microseconds=1)
-            return init, end, prev_init, prev_end
+            init = today - timedelta(days=(((today.weekday() + 1) % 7))+7)
+            end = today.replace(hour=23, minute=59, second=59, microsecond=999999)
+            return init, end
 
         elif period == "month":
-            init = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            init_at = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            end_at = init_at - timedelta(microseconds=1)
+            init = end_at.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             end = today
-            prev_end = init - timedelta(microseconds=1)
-            prev_init = prev_end.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            return init, end, prev_init, prev_end
+            return init, end
         
         elif period == "all":
-            end = 253402300799
-            init = 126701150399
-            prev_init = 0
-            prev_end = 126701150399
+            end = today.replace(hour=23, minute=59, second=59, microsecond=999999)
+            init = datetime.fromtimestamp(0)
+            return init, end
 
         elif period == "custom" and date_from and date_to:
             try:
@@ -48,17 +42,15 @@ def period_handler(period: str, date_from: str | None = None, date_to: str | Non
             delta = end - init
             prev_end = init - timedelta(microseconds=1)
             prev_init = prev_end - delta
-            return init, end, prev_init, prev_end
+            return end, prev_end
 
     except Exception:
         pass  
 
 
-    init = today
+    init = today - timedelta(days=1)
     end = today.replace(hour=23, minute=59, second=59, microsecond=999999)
-    prev_end = init - timedelta(microseconds=1)
-    prev_init = init - timedelta(days=1)
-    return init, end, prev_init, prev_end
+    return init, end
 
 def process_leads(leads_list: list):
     if not leads_list:
@@ -84,15 +76,18 @@ def process_leads(leads_list: list):
 
     result = []
     for group_leads in groups.values():
-        converted = any(l["pipeline_id"] == CONVERT_PIPE and l["status_id"] == WON_STATUS for l in group_leads)
-        plan = any(l["pipeline_id"] == PLAN_PIPE and l["status_id"] == WON_STATUS for l in group_leads)
+        converted = any(l["pipeline_id"] == int(CONVERT_PIPE) and l["status_id"] == int(WON_STATUS) for l in group_leads)
+        plan = any(l["pipeline_id"] == int(PLAN_PIPE) and l["status_id"] == int(WON_STATUS) for l in group_leads)
+        follow_up = any(l["pipeline_id"] == int(FOLLOW_PIPE) for l in group_leads)
 
         latest_lead = max(group_leads, key=lambda l: l["created_at"])
+
         oldest_created_at = min(l["created_at"] for l in group_leads)
         latest_lead["created_at"] = oldest_created_at
 
         latest_lead["converted"] = converted
         latest_lead["plan"] = plan
+        latest_lead["follow_up"] = follow_up
 
         result.append(latest_lead)
 
@@ -117,7 +112,7 @@ def dashboard_format(leads: list):
         if term not in result_dict[date_str][campaign]:
             result_dict[date_str][campaign][term] = {}
         if content not in result_dict[date_str][campaign][term]:
-            result_dict[date_str][campaign][term][content] = {"leads": 0, "converted_leads": 0, "plan_leads": 0}
+            result_dict[date_str][campaign][term][content] = {"leads": 0, "follow_up": 0, "converted_leads": 0, "plan_leads": 0}
 
         counts = result_dict[date_str][campaign][term][content]
         counts["leads"] += 1
@@ -125,6 +120,8 @@ def dashboard_format(leads: list):
             counts["converted_leads"] += 1
         if lead.get("plan"):
             counts["plan_leads"] += 1
+        if lead.get("follow_up"):
+            counts["follow_up"] += 1
 
     final_result = []
     for date, campaigns in result_dict.items():
@@ -153,13 +150,15 @@ def dashboard_format_flat(leads: list):
         key = (date_str, campaign, term, content)
 
         if key not in flat_dict:
-            flat_dict[key] = {"leads": 0, "converted_leads": 0, "plan_leads": 0}
+            flat_dict[key] = {"leads": 0, "follow_up": 0, "converted_leads": 0, "plan_leads": 0}
 
         flat_dict[key]["leads"] += 1
         if lead.get("converted"):
             flat_dict[key]["converted_leads"] += 1
         if lead.get("plan"):
             flat_dict[key]["plan_leads"] += 1
+        if lead.get("follow_up"):
+            flat_dict[key]["follow_up"] += 1
 
     flat_list = [
         {
