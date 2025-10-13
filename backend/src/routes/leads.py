@@ -48,10 +48,8 @@ def get_leads(
 def get_dashboard(
     campaigns: list[int] | None = Query(None, description="Campaign IDs"),
     period: str = Query("all", description="Period: day, yesterday, week, month, custom, all (slow)"),
-    date_from: str | None = Query(None, description="Initial date (dd/mm/YYYY)"),
-    date_to: str | None = Query(None, description="Final date (dd/mm/YYYY)"),
-    pipeline_id: int | None = Query(None, description="Pipeline ID"),
-    status_id: int | None = Query(None, description="Status ID"),
+    date_from: str | None = Query(None, description="Initial date if period custom (dd/mm/YYYY)"),
+    date_to: str | None = Query(None, description="Final date if period custom (dd/mm/YYYY)"),
     flat: bool = Query(False, description="Flat data for dashboard (default=False)")
 ): 
     cache_key = generate_cache_key(
@@ -59,8 +57,6 @@ def get_dashboard(
         period=period,
         date_from=date_from,
         date_to=date_to,
-        pipeline_id=pipeline_id,
-        status_id=status_id,
         flat=flat
     )
 
@@ -73,8 +69,6 @@ def get_dashboard(
         period=period,
         date_from=date_from,
         date_to=date_to,
-        pipeline_id=pipeline_id,
-        status_id=status_id,
     )
 
     leads = process_leads(leads)
