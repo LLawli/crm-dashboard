@@ -87,6 +87,8 @@ def fetch_leads(
                 if not items:
                     break
 
+                print(items)
+
                 items = [lead for lead in items if get_utm_campaign(lead) == campaign]
 
                 leads.extend(items)

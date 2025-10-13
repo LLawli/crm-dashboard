@@ -31,18 +31,21 @@ def period_handler(period: str, date_from: str | None = None, date_to: str | Non
             try:
                 date_from_datetime = datetime.strptime(date_from, "%d/%m/%Y")
                 date_to_datetime = datetime.strptime(date_to, "%d/%m/%Y")
-            except Exception:
-                raise  
+            except ValueError:
+                raise ValueError("Formato de data inválido. Use dd/mm/yyyy.")
 
             if date_from_datetime > date_to_datetime:
-                date_to_datetime = date_from_datetime + timedelta(days=1) 
+                date_from_datetime, date_to_datetime = date_to_datetime, date_from_datetime
 
-            init = date_from_datetime.replace(hour=0, minute=0, second=0, microsecond=0)
-            end = date_to_datetime.replace(hour=23, minute=59, second=59, microsecond=999999)
-            delta = end - init
-            prev_end = init - timedelta(microseconds=1)
+            current_init = date_from_datetime.replace(hour=0, minute=0, second=0, microsecond=0)
+            current_end = date_to_datetime.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+            delta = current_end - current_init
+
+            prev_end = current_init - timedelta(microseconds=1)
             prev_init = prev_end - delta
-            return end, prev_end
+
+            return prev_init, current_end
 
     except Exception:
         pass  
