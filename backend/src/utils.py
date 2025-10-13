@@ -76,12 +76,21 @@ def process_leads(leads_list: list):
 
     result = []
     for group_leads in groups.values():
-        converted = any(l["pipeline_id"] == int(CONVERT_PIPE) and l["status_id"] == int(WON_STATUS) for l in group_leads)
-        plan = any(l["pipeline_id"] == int(PLAN_PIPE) and l["status_id"] == int(WON_STATUS) for l in group_leads)
+        converted_leads = [
+            l for l in group_leads
+            if l["pipeline_id"] == int(CONVERT_PIPE) and l["status_id"] == int(WON_STATUS)
+        ]
+        plan_leads = [
+            l for l in group_leads
+            if l["pipeline_id"] == int(PLAN_PIPE) and l["status_id"] == int(WON_STATUS)
+        ]
+
+        converted = min(converted_leads, key=lambda l: l["created_at"])["updated_at"] if converted_leads else None
+        plan = min(plan_leads, key=lambda l: l["created_at"])["updated_at"] if plan_leads else None
+
         follow_up = any(l["pipeline_id"] == int(FOLLOW_PIPE) for l in group_leads)
 
         latest_lead = max(group_leads, key=lambda l: l["created_at"])
-
         oldest_created_at = min(l["created_at"] for l in group_leads)
         latest_lead["created_at"] = oldest_created_at
 
@@ -95,54 +104,118 @@ def process_leads(leads_list: list):
 
 
 def dashboard_format(leads: list):
+    if not leads:
+        return []
+
+    all_dates = [
+        datetime.fromtimestamp(l["created_at"]).date()
+        for l in leads
+    ]
+    min_date, max_date = min(all_dates), max(all_dates)
+
     result_dict = {}
+    current_date = min_date
+    while current_date <= max_date:
+        date_str = current_date.strftime("%d/%m/%Y")
+        result_dict[date_str] = {}
+        current_date += timedelta(days=1)
 
     for lead in leads:
         date_str = datetime.fromtimestamp(lead["created_at"]).strftime("%d/%m/%Y")
 
-        fields = {f.get("field_code"): f["values"][0]["value"] for f in lead.get("custom_fields_values", []) if f.get("field_code")}
+        fields = {
+            f.get("field_code"): f["values"][0]["value"]
+            for f in lead.get("custom_fields_values", [])
+            if f.get("field_code")
+        }
         campaign = fields.get("UTM_CAMPAIGN", "Unknown")
         term = fields.get("UTM_TERM", "Unknown")
         content = fields.get("UTM_CONTENT", "Unknown")
 
-        if date_str not in result_dict:
-            result_dict[date_str] = {}
         if campaign not in result_dict[date_str]:
             result_dict[date_str][campaign] = {}
         if term not in result_dict[date_str][campaign]:
             result_dict[date_str][campaign][term] = {}
         if content not in result_dict[date_str][campaign][term]:
-            result_dict[date_str][campaign][term][content] = {"leads": 0, "follow_up": 0, "converted_leads": 0, "plan_leads": 0}
+            result_dict[date_str][campaign][term][content] = {
+                "leads": 0,
+                "follow_up": 0,
+                "converted_leads": 0,
+                "plan_leads": 0
+            }
 
         counts = result_dict[date_str][campaign][term][content]
         counts["leads"] += 1
-        if lead.get("converted"):
-            counts["converted_leads"] += 1
-        if lead.get("plan"):
-            counts["plan_leads"] += 1
         if lead.get("follow_up"):
             counts["follow_up"] += 1
 
+    for lead in leads:
+        fields = {
+            f.get("field_code"): f["values"][0]["value"]
+            for f in lead.get("custom_fields_values", [])
+            if f.get("field_code")
+        }
+        campaign = fields.get("UTM_CAMPAIGN", "Unknown")
+        term = fields.get("UTM_TERM", "Unknown")
+        content = fields.get("UTM_CONTENT", "Unknown")
+
+        for key, field_name in [("converted", "converted_leads"), ("plan", "plan_leads")]:
+            ts = lead.get(key)
+            if ts:
+                conv_date = datetime.fromtimestamp(ts).date()
+                if min_date <= conv_date <= max_date:
+                    date_str = conv_date.strftime("%d/%m/%Y")
+                else:
+                    continue
+
+                if campaign not in result_dict[date_str]:
+                    result_dict[date_str][campaign] = {}
+                if term not in result_dict[date_str][campaign]:
+                    result_dict[date_str][campaign][term] = {}
+                if content not in result_dict[date_str][campaign][term]:
+                    result_dict[date_str][campaign][term][content] = {
+                        "leads": 0,
+                        "follow_up": 0,
+                        "converted_leads": 0,
+                        "plan_leads": 0
+                    }
+
+                result_dict[date_str][campaign][term][content][field_name] += 1
+
     final_result = []
-    for date, campaigns in result_dict.items():
+    for date, campaigns in sorted(result_dict.items(), key=lambda x: datetime.strptime(x[0], "%d/%m/%Y")):
         campaign_list = []
         for campaign_name, terms in campaigns.items():
             term_list = []
             for term_name, contents in terms.items():
-                content_list = [{"name": content_name, **counts} for content_name, counts in contents.items()]
+                content_list = [
+                    {"name": content_name, **counts}
+                    for content_name, counts in contents.items()
+                ]
                 term_list.append({"name": term_name, "contents": content_list})
             campaign_list.append({"name": campaign_name, "terms": term_list})
         final_result.append({"date": date, "campaigns": campaign_list})
 
     return final_result
 
+
 def dashboard_format_flat(leads: list):
+    if not leads:
+        return []
+
+    all_dates = [datetime.fromtimestamp(l["created_at"]).date() for l in leads]
+    min_date, max_date = min(all_dates), max(all_dates)
+
     flat_dict = {}
 
     for lead in leads:
         date_str = datetime.fromtimestamp(lead["created_at"]).strftime("%d/%m/%Y")
 
-        fields = {f.get("field_code"): f["values"][0]["value"] for f in lead.get("custom_fields_values", []) if f.get("field_code")}
+        fields = {
+            f.get("field_code"): f["values"][0]["value"]
+            for f in lead.get("custom_fields_values", [])
+            if f.get("field_code")
+        }
         campaign = fields.get("UTM_CAMPAIGN", "Unknown")
         term = fields.get("UTM_TERM", "Unknown")
         content = fields.get("UTM_CONTENT", "Unknown")
@@ -153,12 +226,34 @@ def dashboard_format_flat(leads: list):
             flat_dict[key] = {"leads": 0, "follow_up": 0, "converted_leads": 0, "plan_leads": 0}
 
         flat_dict[key]["leads"] += 1
-        if lead.get("converted"):
-            flat_dict[key]["converted_leads"] += 1
-        if lead.get("plan"):
-            flat_dict[key]["plan_leads"] += 1
         if lead.get("follow_up"):
             flat_dict[key]["follow_up"] += 1
+
+    for lead in leads:
+        fields = {
+            f.get("field_code"): f["values"][0]["value"]
+            for f in lead.get("custom_fields_values", [])
+            if f.get("field_code")
+        }
+        campaign = fields.get("UTM_CAMPAIGN", "Unknown")
+        term = fields.get("UTM_TERM", "Unknown")
+        content = fields.get("UTM_CONTENT", "Unknown")
+
+        for key_name, count_field in [("converted", "converted_leads"), ("plan", "plan_leads")]:
+            ts = lead.get(key_name)
+            if ts:
+                conv_date = datetime.fromtimestamp(ts).date()
+                if min_date <= conv_date <= max_date:
+                    date_str = conv_date.strftime("%d/%m/%Y")
+                else:
+                    continue
+
+                key = (date_str, campaign, term, content)
+
+                if key not in flat_dict:
+                    flat_dict[key] = {"leads": 0, "follow_up": 0, "converted_leads": 0, "plan_leads": 0}
+
+                flat_dict[key][count_field] += 1
 
     flat_list = [
         {
@@ -168,7 +263,10 @@ def dashboard_format_flat(leads: list):
             "content": content,
             **counts
         }
-        for (date, campaign, term, content), counts in flat_dict.items()
+        for (date, campaign, term, content), counts in sorted(
+            flat_dict.items(),
+            key=lambda x: datetime.strptime(x[0][0], "%d/%m/%Y")
+        )
     ]
 
     return flat_list
