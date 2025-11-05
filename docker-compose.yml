@@ -1,19 +1,37 @@
 services:
-    web:
-        build: backend
-        ports:
-            - "3000:3000"
-        env_file:
-            - backend/.env
-        depends_on:
-            - cache
-    
-    cache:
-        image: redis:7
-        ports:
-            - "6379:6379"
-        volumes:
-            - redis_data:/data
+  web:
+    build: backend
+    ports:
+      - "3000:3000"
+    env_file:
+      - backend/.env
+    depends_on:
+      - cache
+    volumes:
+      - ./backend:/app
+      - sqlite_data:/app
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # Permite que outros containers o encontrem pelo alias
 
+  cache:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  frontend:
+    build:
+      context: ./frontend/dashboard
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - web
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 volumes:
-    redis_data:
+  redis_data:
+  sqlite_data:
