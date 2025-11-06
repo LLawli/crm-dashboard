@@ -1,9 +1,9 @@
 backend/.env
 backend/.venv
 backend/__pycache__
-backend/src/__pycache__
-backend/src/routes/__pycache__
-backend/src/services/__pycache__
+backend/app/__pycache__
+backend/app/api/__pycache__
+backend/app/services/__pycache__
 backend/uv.lock
 backend/pyproject.toml
 .env

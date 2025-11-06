@@ -41,3 +41,29 @@ class KPIQuery(BaseModel):
 
     def validate(self):
         self.date_range.validate()
+
+class LeadRequest(BaseModel):
+    # UTMs
+    utm_source: str | None = None
+    utm_medium: str | None = None
+    utm_campaign: str | None = None
+    utm_content: str | None = None
+    utm_term: str | None = None
+    utm_id: str | None = None
+    
+    # Facebook click id
+    fbclid: str | None = None
+    gclid: str | None = None
+    
+    # Código
+    code: str | None = None
+    
+    # Dados pessoais
+    name: str | None = None
+    whatsapp: str | None = None
+    
+    # Respostas das perguntas (texto concatenado)
+    responses: dict[str, str] | None = None
+
+    class Config:
+        extra = "ignore"

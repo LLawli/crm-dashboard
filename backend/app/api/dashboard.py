@@ -192,7 +192,8 @@ WITH first_lead AS (
 first_close AS (
   SELECT
     lead,
-    MIN(closed_at) AS first_closed_at
+    MIN(closed_at) AS first_closed_at,
+    ANY_VALUE(pipeline_id) AS pipeline_id
   FROM leads
   WHERE status_id = 142
     AND closed_at IS NOT NULL
@@ -201,20 +202,32 @@ first_close AS (
 SELECT
   fl.utm_campaign,
   COUNT(DISTINCT fl.lead) AS total_leads,
-  COUNT(DISTINCT fc.lead) AS converted_leads,
+
+  -- conversões por tipo de pipeline
+  COUNT(DISTINCT CASE WHEN fc.pipeline_id = 11704932 THEN fc.lead END) AS consult_converted,
+  COUNT(DISTINCT CASE WHEN fc.pipeline_id = 11959711 THEN fc.lead END) AS plan_converted,
+
+  -- taxas relativas ao total
   COALESCE(ROUND(
-    CAST(
-      COUNT(DISTINCT fc.lead) * 100.0 / NULLIF(COUNT(DISTINCT fl.lead), 0) AS DOUBLE
-    ), 2
-  ), 0) AS conversion_rate,
+    COUNT(DISTINCT CASE WHEN fc.pipeline_id = 11704932 THEN fc.lead END) * 100.0 /
+    NULLIF(COUNT(DISTINCT fl.lead), 0), 2
+  ), 0) AS consult_rate,
   COALESCE(ROUND(
-    avg(DATE_DIFF('day', fl.first_created_at, fc.first_closed_at)),
-    2
+    COUNT(DISTINCT CASE WHEN fc.pipeline_id = 11959711 THEN fc.lead END) * 100.0 /
+    NULLIF(COUNT(DISTINCT fl.lead), 0), 2
+  ), 0) AS plan_rate,
+
+  -- tempo médio para conversão (geral)
+  COALESCE(ROUND(
+    AVG(DATE_DIFF('day', fl.first_created_at, fc.first_closed_at)), 2
   ), 0) AS avg_time_to_convert
+
 FROM first_lead fl
 LEFT JOIN first_close fc USING (lead)
 WHERE fl.first_created_at BETWEEN ? AND ?
-  AND fl.utm_campaign IN ({','.join('?' for _ in request.campaigns) if isinstance(request.campaigns, list) else '?'})
+  AND fl.utm_campaign IN (
+    {','.join('?' for _ in request.campaigns) if isinstance(request.campaigns, list) else '?'}
+  )
 GROUP BY fl.utm_campaign
 ORDER BY total_leads DESC;
 """
