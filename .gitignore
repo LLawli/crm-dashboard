@@ -8,3 +8,4 @@ backend/uv.lock
 backend/pyproject.toml
 .env
 backend/dashboard.db
+backend/data/*
